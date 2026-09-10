@@ -10,3 +10,4 @@ static/uploads/*
 
 .pytest_cache/
 *.egg-info/
+.vercel

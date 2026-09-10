@@ -4,30 +4,16 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
-# Single source of truth for the built-in categories: (key, display_name).
-# Used to seed the Category table (app.py) and to build the upload form's
-# <select> choices (forms.py) so the two never drift out of sync.
-CATEGORY_SEED = [
-    ("practical", "Practical Programs"),
-    ("project", "Project Source Code"),
-    ("seminar", "Seminar PPTs"),
-    ("documentation", "Project Documentation"),
-    ("coding", "Coding Practice"),
-    ("interview", "Interview Preparation"),
-    ("resume", "Resume Templates"),
-    ("links", "Useful Learning Links"),
-]
-
-# Emoji icons for each category key (used in templates).
+# Short labels for each category key (used in templates).
 CATEGORY_ICONS = {
-    "practical": "💻",
-    "project": "🚀",
-    "seminar": "📊",
-    "documentation": "📄",
-    "coding": "⌨️",
-    "interview": "💡",
-    "resume": "📝",
-    "links": "🔗",
+    "practical": "PR",
+    "project": "PC",
+    "seminar": "SP",
+    "documentation": "DOC",
+    "coding": "CP",
+    "interview": "IP",
+    "resume": "CV",
+    "links": "LINK",
 }
 
 # Gradient CSS classes per category (used in templates).

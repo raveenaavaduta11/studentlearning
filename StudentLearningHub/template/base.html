@@ -8,10 +8,10 @@
 
     <title>{% block title %}Student Learning Hub{% endblock %}</title>
 
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Manrope -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     {% block head_extra %}{% endblock %}
@@ -23,7 +23,7 @@
     <header class="topbar">
         <div class="brand-wrap">
             <a href="{{ url_for('index') }}" class="brand-link">
-                <div class="brand-mark">🎓</div>
+                <div class="brand-mark">SLH</div>
                 <div class="brand-text">Student Learning Hub</div>
             </a>
         </div>
@@ -40,32 +40,25 @@
                 <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Home</a>
                 <a href="{{ url_for('resources') }}" class="{% if request.endpoint == 'resources' %}active{% endif %}">Resources</a>
                 <a href="{{ url_for('categories') }}" class="{% if request.endpoint == 'categories' %}active{% endif %}">Categories</a>
-                {% if user %}
-                    {% if user.role == 'admin' %}
-                    <a href="{{ url_for('admin') }}" class="{% if request.endpoint == 'admin' %}active{% endif %}">Admin</a>
-                    {% endif %}
-                    <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
-                {% else %}
-                    <a href="{{ url_for('about') }}" class="{% if request.endpoint == 'about' %}active{% endif %}">About Us</a>
-                    <a href="{{ url_for('contact') }}" class="{% if request.endpoint == 'contact' %}active{% endif %}">Contact</a>
-                {% endif %}
+                <a href="{{ url_for('about') }}" class="{% if request.endpoint == 'about' %}active{% endif %}">About Us</a>
+                <a href="{{ url_for('contact') }}" class="{% if request.endpoint == 'contact' %}active{% endif %}">Contact</a>
             </nav>
 
             <div class="nav-actions">
-                <!-- Functional Search Box -->
-                <form class="search-box" action="{{ url_for('resources') }}" method="get">
-                    <span>🔍</span>
-                    <input type="search" name="search" placeholder="Search resources..." aria-label="Search resources"
-                           value="{{ request.args.get('search', '') }}">
-                </form>
-
                 {% if user %}
-                    <div class="user-badge">
-                        <span class="avatar-initials">{{ user.name[0]|upper }}</span>
-                        <span class="user-name-short">{{ user.name.split(' ')[0] }}</span>
-                    </div>
-                    <a href="{{ url_for('upload') }}" class="button small-button">Upload</a>
-                    <a href="{{ url_for('logout') }}" class="button small-button secondary-button light">Logout</a>
+                    <details class="profile-menu">
+                        <summary class="user-badge" aria-label="Open profile menu" aria-haspopup="menu">
+                            <span class="avatar-initials">{{ user.name[0]|upper }}</span>
+                            <span class="user-name-short">{{ user.name.split(' ')[0] }}</span>
+                        </summary>
+                        <div class="profile-menu-items">
+                            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                            {% if user.role == 'admin' %}
+                            <a href="{{ url_for('admin') }}">Admin</a>
+                            {% endif %}
+                            <a href="{{ url_for('logout') }}">Logout</a>
+                        </div>
+                    </details>
                 {% else %}
                     <a href="{{ url_for('auth') }}" class="button small-button">Login</a>
                 {% endif %}
@@ -96,7 +89,7 @@
     <footer class="site-footer">
         <div class="footer-inner">
             <div class="footer-brand">
-                <div class="brand-mark">🎓</div>
+                <div class="brand-mark">SLH</div>
                 <div>
                     <h3>Student Learning Hub</h3>
                     <p>Learn, Share, Grow Together.</p>
@@ -115,19 +108,20 @@
             <div class="footer-col">
                 <h4>Categories</h4>
                 <ul>
-                    <li><a href="{{ url_for('resources', category='practical') }}">Practical Programs</a></li>
-                    <li><a href="{{ url_for('resources', category='project') }}">Project Source Code</a></li>
-                    <li><a href="{{ url_for('resources', category='seminar') }}">Seminar PPTs</a></li>
+                    {% for category in footer_categories %}
+                    <li><a href="{{ url_for('resources', category=category.key) }}">{{ category.name }}</a></li>
+                    {% else %}
+                    <li><span>No categories yet</span></li>
+                    {% endfor %}
                 </ul>
             </div>
 
             <div class="footer-col">
-                <h4>Follow Us</h4>
-                <div class="social-row">
-                    <a href="#" class="social-icon" aria-label="Facebook">f</a>
-                    <a href="#" class="social-icon" aria-label="LinkedIn">in</a>
-                    <a href="#" class="social-icon" aria-label="Twitter">x</a>
-                </div>
+                <h4>Learn More</h4>
+                <ul>
+                    <li><a href="{{ url_for('about') }}">About Us</a></li>
+                    <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                </ul>
             </div>
         </div>
         <div class="footer-bottom">© 2025 Student Learning Hub. All rights reserved.</div>

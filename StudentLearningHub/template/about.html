@@ -14,17 +14,17 @@
     <main class="home-main">
         <!-- Our Mission -->
         <section class="content-panel glass-panel animate-fade-up">
-            <h2>🎯 Our Mission</h2>
+            <h2>Our Mission</h2>
             <p>
-                At Student Learning Hub, we believe that knowledge should be accessible to everyone. Our mission is to create a vibrant community where students can share, learn, and grow together. We're committed to providing a platform that makes it easy for students to upload, discover, and benefit from educational resources.
+                Student Learning Hub gives students one organized place to share, discover, and manage academic resources. The project focuses on making useful notes, code, presentations, and project files easier to find.
             </p>
         </section>
 
         <!-- Our Vision -->
         <section class="content-panel glass-panel animate-fade-up">
-            <h2>🔮 Our Vision</h2>
+            <h2>Our Vision</h2>
             <p>
-                We envision a world where every student has access to high-quality learning materials and can collaborate with peers to enhance their educational journey. Through our platform, we aim to democratize education and foster a culture of continuous learning.
+                The platform is designed around a simple workflow: browse by category, search for a resource, preview or download it after login, and contribute useful material through a student account.
             </p>
         </section>
 
@@ -33,56 +33,56 @@
             <h2>Why Choose Us?</h2>
             <div class="category-grid">
                 <article class="category-card cat-cyan">
-                    <div class="icon-box">📚</div>
-                    <h3>Rich Repository</h3>
-                    <p>Access thousands of resources shared by students across various categories.</p>
+                    <div class="icon-box">01</div>
+                    <h3>Student Uploads</h3>
+                    <p>Students can upload notes, code, presentations, documents, and other permitted files.</p>
                 </article>
 
                 <article class="category-card cat-blue">
-                    <div class="icon-box">🤝</div>
-                    <h3>Community Driven</h3>
-                    <p>Built by students, for students. Share your knowledge and help others learn.</p>
+                    <div class="icon-box">02</div>
+                    <h3>Searchable Resources</h3>
+                    <p>Search resource titles and descriptions to find relevant learning material quickly.</p>
                 </article>
 
                 <article class="category-card cat-purple">
-                    <div class="icon-box">⚡</div>
-                    <h3>Easy to Use</h3>
-                    <p>Simple and intuitive interface designed for seamless resource sharing.</p>
+                    <div class="icon-box">03</div>
+                    <h3>Categories</h3>
+                    <p>Organize resources into practical programs, projects, seminars, coding, interviews, and more.</p>
                 </article>
 
                 <article class="category-card cat-green">
-                    <div class="icon-box">🔒</div>
-                    <h3>Secure & Private</h3>
-                    <p>Your data is safe with us. We prioritize privacy and security.</p>
+                    <div class="icon-box">04</div>
+                    <h3>Account Controls</h3>
+                    <p>Passwords are hashed, forms use CSRF protection, and protected actions require login.</p>
                 </article>
 
                 <article class="category-card cat-orange">
-                    <div class="icon-box">🌍</div>
-                    <h3>Global Reach</h3>
-                    <p>Connect with students from around the world and expand your learning network.</p>
+                    <div class="icon-box">05</div>
+                    <h3>Preview & Download</h3>
+                    <p>Logged-in users can preview supported files and download other permitted resources.</p>
                 </article>
 
                 <article class="category-card cat-pink">
-                    <div class="icon-box">🚀</div>
-                    <h3>Always Growing</h3>
-                    <p>We continuously update and improve our platform based on user feedback.</p>
+                    <div class="icon-box">06</div>
+                    <h3>Admin Moderation</h3>
+                    <p>Administrators can review resources, view platform statistics, and manage non-admin users.</p>
                 </article>
             </div>
         </section>
 
-        <!-- Our Team -->
+        <!-- Project Scope -->
         <section class="content-panel glass-panel animate-fade-up">
-            <h2>👥 Our Team</h2>
+            <h2>Project Scope</h2>
             <p>
-                Student Learning Hub is maintained by a dedicated team of developers and educators passionate about making education accessible. We work tirelessly to ensure that our platform serves the needs of students worldwide.
+                This application is a local academic prototype built with Flask, SQLite, SQLAlchemy, WTForms, JavaScript, and CSS. It demonstrates the complete resource-sharing workflow and can be extended with email notifications, stronger file inspection, and production deployment controls.
             </p>
         </section>
 
         <!-- Call to Action -->
         <section class="cta-panel animate-fade-up">
-            <h2>Ready to Get Started?</h2>
-            <p>Join thousands of students sharing and learning together.</p>
-            <a href="{{ url_for('upload') }}" class="button">Share a Resource</a>
+            <h2>Explore the Resources</h2>
+            <p>Browse the current collection or sign in to contribute your own material.</p>
+            <a href="{{ url_for('resources') }}" class="button">Browse Resources</a>
         </section>
     </main>
 {% endblock %}

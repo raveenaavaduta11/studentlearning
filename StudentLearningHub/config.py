@@ -21,11 +21,20 @@ ALLOWED_UPLOAD_EXTENSIONS = {
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_SECRET_KEY)
     WTF_CSRF_ENABLED = True
-    SQLALCHEMY_DATABASE_URI = os.getenv(
+    database_url = os.getenv(
         "DATABASE_URL",
         f"sqlite:///{os.path.join(BASE_DIR, 'instance', 'student_learning_hub.db')}",
     )
+    # Some hosted PostgreSQL providers still return the legacy postgres:// form.
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    SQLALCHEMY_DATABASE_URI = database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+    }
 
     # Reject uploads larger than 10 MB before they hit the view function.
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024

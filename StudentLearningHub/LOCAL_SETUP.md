@@ -9,24 +9,26 @@
 ## 1. Open the project folder
 
 ```powershell
-cd D:\studentlearning\StudentLearningHub
+cd D:\projects\studentlearning\StudentLearningHub
 ```
 
 ## 2. Create a virtual environment
 
-Run this once:
+Run this once when setting up the project on a new machine:
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" -m venv .venv
+python -m venv .venv
 ```
 
-If the Python launcher is available, this shorter command also works:
+If `.venv` already exists, skip this step. To confirm the Python version:
 
 ```powershell
-py -3.12 -m venv .venv
+python --version
 ```
 
 ## 3. Install dependencies
+
+Run this after creating the virtual environment, or whenever `requirements.txt` changes:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -43,6 +45,8 @@ Open this address in your browser:
 <http://127.0.0.1:5000>
 
 Keep the terminal open while using the application. Press `Ctrl+C` to stop the server.
+
+For future runs, steps 1 and 4 are usually enough because the virtual environment and dependencies are already installed.
 
 ## 5. Run the tests
 

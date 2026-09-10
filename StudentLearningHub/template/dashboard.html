@@ -39,7 +39,7 @@
 
                 <!-- Edit Profile -->
                 <details class="change-password">
-                    <summary>✏️ Edit Profile</summary>
+                    <summary>Edit Profile</summary>
                     <form method="post" action="{{ url_for('edit_profile') }}" class="password-form">
                         {{ profile_form.hidden_tag() }}
                         <div class="form-group">
@@ -56,7 +56,7 @@
 
                 <!-- Change Password -->
                 <details class="change-password">
-                    <summary>🔒 Change Password</summary>
+                    <summary>Change Password</summary>
                     <form method="post" action="{{ url_for('change_password') }}" class="password-form">
                         {{ password_form.hidden_tag() }}
                         <div class="form-group">
@@ -93,21 +93,6 @@
 
         </div>
 
-        <!-- Quick Actions -->
-        <section class="animate-fade-up">
-            <h2>Quick Actions</h2>
-            <div class="quick-actions">
-                <a href="{{ url_for('upload') }}" class="action-card glass-panel">
-                    <h3>📤 Upload Resource</h3>
-                    <p>Share a useful resource with other students.</p>
-                </a>
-                <a href="{{ url_for('resources') }}" class="action-card glass-panel">
-                    <h3>📚 Browse Resources</h3>
-                    <p>Find and download useful learning materials.</p>
-                </a>
-            </div>
-        </section>
-
         <!-- Uploaded Resources -->
         <section class="animate-fade-up">
             <div class="section-heading">
@@ -115,16 +100,23 @@
                 <p>Resources you have shared with other students.</p>
             </div>
 
+            <form class="dashboard-filter" method="get" action="{{ url_for('dashboard') }}">
+                <input type="search" name="search" value="{{ dashboard_search }}" placeholder="Search your uploads">
+                <button type="submit" class="button small-button">Search</button>
+            </form>
+
             <div class="my-resources">
                 {% for item in user_resources %}
                 <article class="my-resource-card glass-panel">
                     <div>
                         <span class="resource-category">{{ item.category.name }}</span>
                         <h3>{{ item.title }}</h3>
+                        <p class="resource-file-meta">{{ item.file_name.rsplit('.', 1)[-1].upper() }} · {{ item.file_name }}</p>
                         <p>Uploaded on: {{ item.created_at.strftime('%d %B %Y') }}</p>
                     </div>
                     <div class="resource-actions">
                         <a href="{{ url_for('resource', resource_id=item.id) }}" class="button">View</a>
+                        <a href="{{ url_for('download_resource', resource_id=item.id) }}" class="button secondary-button">Download</a>
                         <form method="post" action="{{ url_for('delete_resource', resource_id=item.id) }}"
                               onsubmit="return confirm('Delete this resource?');" style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -133,15 +125,16 @@
                     </div>
                 </article>
                 {% else %}
-                <p class="empty-state">You haven't uploaded any resources yet. <a href="{{ url_for('upload') }}">Upload your first resource →</a></p>
+                <p class="empty-state">
+                    {% if dashboard_search %}
+                    No uploads match your search. <a href="{{ url_for('dashboard') }}">Clear search</a>
+                    {% else %}
+                    You haven't uploaded any resources yet. <a href="{{ url_for('upload') }}">Upload your first resource</a>
+                    {% endif %}
+                </p>
                 {% endfor %}
             </div>
         </section>
-
-        <!-- Logout -->
-        <div class="logout-area">
-            <a href="{{ url_for('logout') }}" class="button logout-button">Logout</a>
-        </div>
 
     </main>
 {% endblock %}

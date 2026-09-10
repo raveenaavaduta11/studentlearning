@@ -18,8 +18,8 @@
 
             <div class="category-grid">
                 {% for category in categories_list %}
-                <a href="{{ url_for('resources', category=category.key) }}" class="category-card {{ category_colors.get(category.key, '') }}" style="text-decoration:none; color:inherit;">
-                    <div class="icon-box">{{ category_icons.get(category.key, '📁') }}</div>
+                <a href="{{ url_for('resources', category=category.key) }}" class="category-card {{ category_color(category) }}" style="text-decoration:none; color:inherit;">
+                    <div class="icon-box">{{ category_icon(category) }}</div>
                     <h3>{{ category.name }}</h3>
                     <p>{{ category.description }}</p>
                     <div class="meta-row"><span>{{ category.resources|length }} Resources</span></div>
@@ -32,15 +32,15 @@
 
         <!-- Category Information -->
         <section class="content-panel glass-panel animate-fade-up">
-            <h2>📖 How to Use Categories</h2>
+            <h2>How to Use Categories</h2>
             <p>Our platform organizes resources into categories to help you find exactly what you need:</p>
             <ul style="margin-left: 20px; line-height: 2;">
-                <li><strong>💻 Practical Programs:</strong> Code examples and solutions for learning programming concepts.</li>
-                <li><strong>🚀 Project Source Code:</strong> Complete source code for mini-projects and academic assignments.</li>
-                <li><strong>📊 Seminar PPTs:</strong> PowerPoint presentations and slides from seminars and lectures.</li>
-                <li><strong>📄 Project Documents:</strong> Reports, documentation, and guides for academic projects.</li>
-                <li><strong>💡 Interview Prep:</strong> Questions, answers, and tips for preparing for job interviews.</li>
-                <li><strong>🔗 Useful Links:</strong> Curated links to external resources and learning platforms.</li>
+                <li><strong>Practical Programs:</strong> Code examples and solutions for learning programming concepts.</li>
+                <li><strong>Project Source Code:</strong> Complete source code for mini-projects and academic assignments.</li>
+                <li><strong>Seminar PPTs:</strong> PowerPoint presentations and slides from seminars and lectures.</li>
+                <li><strong>Project Documents:</strong> Reports, documentation, and guides for academic projects.</li>
+                <li><strong>Interview Prep:</strong> Questions, answers, and tips for preparing for job interviews.</li>
+                <li><strong>Useful Links:</strong> Curated links to external resources and learning platforms.</li>
             </ul>
         </section>
 

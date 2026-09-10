@@ -8,15 +8,20 @@ from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, User, Category, Resource, CATEGORY_SEED, CATEGORY_ICONS, CATEGORY_COLORS
+from models import db, User, Category, Resource, CATEGORY_ICONS, CATEGORY_COLORS
 from forms import (
     RegisterForm, LoginForm, ResourceForm, ChangePasswordForm,
-    ForgotPasswordForm, ResetPasswordForm, EditProfileForm,
+    ForgotPasswordForm, ResetPasswordForm, EditProfileForm, CategoryEditForm,
 )
 import os
 import uuid
 import mimetypes
+import zipfile
+import re
+import hashlib
 from datetime import datetime, timedelta
+import cloudinary
+import cloudinary.uploader
 
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
@@ -42,16 +47,92 @@ def create_app(config_overrides=None):
     with app.app_context():
         db.create_all()
 
-        if Category.query.count() == 0:
-            for key, name in CATEGORY_SEED:
-                db.session.add(Category(key=key, name=name, description=name))
-            db.session.commit()
-
     # ── Helpers ──────────────────────────────────────────────────────
 
     def allowed_file(filename):
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         return ext in app.config["ALLOWED_UPLOAD_EXTENSIONS"]
+
+    def cloudinary_enabled():
+        return all(os.getenv(name) for name in (
+            "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        ))
+
+    def cloudinary_resource_type(filename):
+        return "image" if filename.rsplit(".", 1)[-1].lower() in {"png", "jpg", "jpeg", "gif"} else "raw"
+
+    def remove_stored_file(stored_file_name, file_name, file_path):
+        if cloudinary_enabled() and file_path and file_path.startswith("http"):
+            try:
+                cloudinary.uploader.destroy(
+                    stored_file_name,
+                    resource_type=cloudinary_resource_type(file_name),
+                    invalidate=True,
+                )
+            except Exception:
+                app.logger.exception("Unable to remove Cloudinary file %s", stored_file_name)
+            return
+
+        local_path = os.path.join(app.root_path, "static", "uploads", stored_file_name)
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
+    if cloudinary_enabled():
+        cloudinary.config(
+            cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+            api_key=os.getenv("CLOUDINARY_API_KEY"),
+            api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+            secure=True,
+        )
+
+    def valid_file_signature(file, extension):
+        """Reject files whose content clearly does not match their extension."""
+        position = file.tell()
+        header = file.read(16)
+        file.seek(position)
+
+        if extension == "pdf":
+            return header.startswith(b"%PDF-")
+        if extension in {"png", "jpg", "jpeg", "gif"}:
+            image_signatures = {
+                "png": header.startswith(b"\x89PNG\r\n\x1a\n"),
+                "jpg": header.startswith(b"\xff\xd8\xff"),
+                "jpeg": header.startswith(b"\xff\xd8\xff"),
+                "gif": header.startswith((b"GIF87a", b"GIF89a")),
+            }
+            return image_signatures[extension]
+        if extension in {"doc", "ppt", "xls"}:
+            return header.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+        if extension == "rar":
+            return header.startswith((b"Rar!\x1a\x07\x00", b"Rar!\x1a\x07\x01\x00"))
+        if extension in {"zip", "docx", "pptx", "xlsx"}:
+            if not header.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
+                return False
+            if extension == "zip":
+                return True
+            try:
+                with zipfile.ZipFile(file) as archive:
+                    names = set(archive.namelist())
+                required = {
+                    "docx": "word/",
+                    "pptx": "ppt/",
+                    "xlsx": "xl/",
+                }[extension]
+                return "[Content_Types].xml" in names and any(
+                    name.startswith(required) for name in names
+                )
+            except (OSError, zipfile.BadZipFile):
+                return False
+        if extension == "txt":
+            try:
+                file.seek(position)
+                file.read(4096).decode("utf-8")
+                file.seek(position)
+                return True
+            except UnicodeDecodeError:
+                file.seek(position)
+                return False
+        return True
 
     def current_user():
         user_id = session.get("user_id")
@@ -63,6 +144,20 @@ def create_app(config_overrides=None):
             session.clear()
         return user
 
+    def category_icon(category):
+        if category.key in CATEGORY_ICONS:
+            return CATEGORY_ICONS[category.key]
+        words = re.findall(r"[A-Za-z0-9]+", category.name)
+        initials = "".join(word[0] for word in words).upper()
+        return (initials or category.name[:3]).upper()[:3]
+
+    def category_color(category):
+        if category.key in CATEGORY_COLORS:
+            return CATEGORY_COLORS[category.key]
+        colors = ("cat-cyan", "cat-blue", "cat-purple", "cat-green", "cat-orange", "cat-pink", "cat-yellow", "cat-teal")
+        color_index = int(hashlib.sha256(category.key.encode("utf-8")).hexdigest(), 16) % len(colors)
+        return colors[color_index]
+
     # Inject helpers into every template automatically.
     @app.context_processor
     def inject_globals():
@@ -70,6 +165,9 @@ def create_app(config_overrides=None):
             "user": current_user(),
             "category_icons": CATEGORY_ICONS,
             "category_colors": CATEGORY_COLORS,
+            "category_icon": category_icon,
+            "category_color": category_color,
+            "footer_categories": Category.query.order_by(Category.name.asc()).limit(3).all(),
         }
 
     # ── Public routes ────────────────────────────────────────────────
@@ -240,9 +338,10 @@ def create_app(config_overrides=None):
         resource_item = db.session.get(Resource, resource_id)
         if resource_item is None:
             abort(404)
-        upload_dir = os.path.join(app.root_path, "static", "uploads")
+        if resource_item.file_path and resource_item.file_path.startswith("http"):
+            return redirect(resource_item.file_path)
         return send_from_directory(
-            upload_dir, resource_item.stored_file_name,
+            os.path.join(app.root_path, "static", "uploads"), resource_item.stored_file_name,
             as_attachment=True, download_name=resource_item.file_name,
         )
 
@@ -254,6 +353,8 @@ def create_app(config_overrides=None):
         resource_item = db.session.get(Resource, resource_id)
         if resource_item is None:
             abort(404)
+        if resource_item.file_path and resource_item.file_path.startswith("http"):
+            return redirect(resource_item.file_path)
         mime_type = mimetypes.guess_type(resource_item.file_name)[0] or "application/octet-stream"
         return send_from_directory(
             os.path.join(app.root_path, "static", "uploads"),
@@ -276,10 +377,7 @@ def create_app(config_overrides=None):
         if resource_item.uploaded_by != user.id and user.role != "admin":
             abort(403)
 
-        upload_dir = os.path.join(app.root_path, "static", "uploads")
-        file_path = os.path.join(upload_dir, resource_item.stored_file_name)
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        remove_stored_file(resource_item.stored_file_name, resource_item.file_name, resource_item.file_path)
 
         db.session.delete(resource_item)
         db.session.commit()
@@ -295,12 +393,41 @@ def create_app(config_overrides=None):
             return redirect(url_for("auth"))
 
         form = ResourceForm()
-        if form.validate_on_submit():
+        form.category.choices = [
+            (category.key, category.name)
+            for category in Category.query.order_by(Category.name.asc()).all()
+        ]
+        new_category_name = request.form.get("new_category_name", "").strip()
+        new_category = None
+        category_creation_error = False
+        if new_category_name:
+            new_category_key = re.sub(r"[^a-z0-9]+", "-", new_category_name.lower()).strip("-")[:50]
+            if len(new_category_name) < 2 or not new_category_key:
+                flash("New category names must contain at least two valid characters.", "danger")
+                category_creation_error = True
+            elif Category.query.filter(
+                db.or_(Category.name.ilike(new_category_name), Category.key == new_category_key)
+            ).first():
+                flash("That category already exists. Select it from the category list.", "danger")
+                category_creation_error = True
+            else:
+                new_category = Category(
+                    key=new_category_key,
+                    name=new_category_name,
+                    description=f"Resources about {new_category_name}.",
+                )
+                form.category.choices.append((new_category.key, new_category.name))
+                form.category.data = new_category.key
 
+        if not category_creation_error and form.validate_on_submit():
             file = request.files.get("resource_file")
             original_filename = secure_filename(file.filename) if file and file.filename else ""
             if not original_filename:
                 flash("Please choose a file to upload.", "danger")
+                return render_template("upload.html", form=form)
+
+            if len(original_filename) > 200:
+                flash("The filename must be 200 characters or fewer.", "danger")
                 return render_template("upload.html", form=form)
 
             if not allowed_file(original_filename):
@@ -308,28 +435,41 @@ def create_app(config_overrides=None):
                 return render_template("upload.html", form=form)
 
             ext = original_filename.rsplit(".", 1)[-1].lower()
+            if not valid_file_signature(file, ext):
+                flash("The file content does not match its extension.", "danger")
+                return render_template("upload.html", form=form)
             stored_filename = f"{uuid.uuid4().hex}.{ext}"
 
-            upload_dir = os.path.join(app.root_path, "static", "uploads")
-            os.makedirs(upload_dir, exist_ok=True)
-            file.save(os.path.join(upload_dir, stored_filename))
+            if cloudinary_enabled():
+                cloudinary_result = cloudinary.uploader.upload(
+                    file,
+                    resource_type="auto",
+                    folder="student-learning-hub",
+                    public_id=uuid.uuid4().hex,
+                )
+                stored_filename = cloudinary_result["public_id"]
+                stored_file_path = cloudinary_result["secure_url"]
+            else:
+                upload_dir = os.path.join(app.root_path, "static", "uploads")
+                os.makedirs(upload_dir, exist_ok=True)
+                file.save(os.path.join(upload_dir, stored_filename))
+                stored_file_path = os.path.join("static", "uploads", stored_filename)
 
             category = Category.query.filter_by(key=form.category.data).first()
-            if category is None:
-                category = Category(
-                    key=form.category.data,
-                    name=form.category.data.title(),
-                    description=form.category.data,
-                )
+            if new_category is not None:
+                category = new_category
                 db.session.add(category)
-                db.session.commit()
+                db.session.flush()
+            if category is None:
+                flash("Please select an available category.", "danger")
+                return render_template("upload.html", form=form)
 
             resource_item = Resource(
                 title=form.title.data.strip(),
                 description=form.description.data.strip(),
                 file_name=original_filename,
                 stored_file_name=stored_filename,
-                file_path=os.path.join("static", "uploads", stored_filename),
+                file_path=stored_file_path,
                 category_id=category.id,
                 uploaded_by=user.id,
             )
@@ -348,12 +488,20 @@ def create_app(config_overrides=None):
         if user is None:
             return redirect(url_for("auth"))
 
-        user_resources = Resource.query.filter_by(uploaded_by=user.id).order_by(Resource.created_at.desc()).all()
+        dashboard_search = request.args.get("search", "").strip()
+        resources_query = Resource.query.filter_by(uploaded_by=user.id)
+        if dashboard_search:
+            like_pattern = f"%{dashboard_search}%"
+            resources_query = resources_query.filter(
+                db.or_(Resource.title.ilike(like_pattern), Resource.description.ilike(like_pattern))
+            )
+        user_resources = resources_query.order_by(Resource.created_at.desc()).all()
         password_form = ChangePasswordForm()
         profile_form = EditProfileForm(obj=user)
         return render_template(
             "dashboard.html", user_resources=user_resources,
             password_form=password_form, profile_form=profile_form,
+            dashboard_search=dashboard_search,
         )
 
     @app.route("/account/password", methods=["POST"])
@@ -414,21 +562,91 @@ def create_app(config_overrides=None):
             return redirect(url_for("auth"))
 
         page = request.args.get("page", 1, type=int)
+        resource_search = request.args.get("resource_search", "").strip()
+        resource_category = request.args.get("resource_category", "").strip()
+        user_search = request.args.get("user_search", "").strip()
         if page < 1:
             page = 1
 
-        resources_query = Resource.query.order_by(Resource.created_at.desc())
+        resources_query = Resource.query
+        if resource_search:
+            like_pattern = f"%{resource_search}%"
+            resources_query = resources_query.join(User).filter(
+                db.or_(
+                    Resource.title.ilike(like_pattern),
+                    Resource.description.ilike(like_pattern),
+                    User.name.ilike(like_pattern),
+                )
+            )
+        if resource_category:
+            resources_query = resources_query.join(Category).filter(Category.key == resource_category)
+        resources_query = resources_query.order_by(Resource.created_at.desc())
         total_count = resources_query.count()
         total_pages = max(1, (total_count + RESOURCES_PER_PAGE - 1) // RESOURCES_PER_PAGE)
         page = min(page, total_pages)
         resources_list = resources_query.offset((page - 1) * RESOURCES_PER_PAGE).limit(RESOURCES_PER_PAGE).all()
 
-        users = User.query.order_by(User.created_at.desc()).all()
+        users_query = User.query.order_by(User.created_at.desc())
+        if user_search:
+            like_pattern = f"%{user_search}%"
+            users_query = users_query.filter(
+                db.or_(User.name.ilike(like_pattern), User.email.ilike(like_pattern))
+            )
+        users = users_query.all()
         categories_list = Category.query.order_by(Category.id.asc()).all()
         return render_template(
             "admin.html", resources_list=resources_list, users=users, categories=categories_list,
-            total_resource_count=total_count, page=page, total_pages=total_pages,
+            total_resource_count=Resource.query.count(), page=page, total_pages=total_pages,
+            resource_search=resource_search, resource_category=resource_category,
+            user_search=user_search,
         )
+
+    @app.route("/admin/category/<int:category_id>/edit", methods=["POST"])
+    def edit_category(category_id):
+        admin_user = current_user()
+        if admin_user is None or admin_user.role != "admin":
+            abort(403)
+
+        category = db.session.get(Category, category_id)
+        if category is None:
+            abort(404)
+
+        form = CategoryEditForm()
+        if form.validate_on_submit():
+            name = form.name.data.strip()
+            duplicate = Category.query.filter(
+                Category.id != category.id,
+                db.or_(Category.name.ilike(name), Category.key == re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:50]),
+            ).first()
+            if duplicate:
+                flash("That category already exists.", "danger")
+            else:
+                category.name = name
+                category.description = (form.description.data or "").strip() or f"Resources about {name}."
+                db.session.commit()
+                flash("Category updated successfully.", "success")
+        else:
+            flash("Please enter a valid category name.", "danger")
+        return redirect(url_for("admin"))
+
+    @app.route("/admin/category/<int:category_id>/delete", methods=["POST"])
+    def delete_category(category_id):
+        admin_user = current_user()
+        if admin_user is None or admin_user.role != "admin":
+            abort(403)
+
+        category = db.session.get(Category, category_id)
+        if category is None:
+            abort(404)
+        if category.resources:
+            flash("This category still has resources. Delete or move those resources first.", "danger")
+            return redirect(url_for("admin"))
+
+        category_name = category.name
+        db.session.delete(category)
+        db.session.commit()
+        flash(f"Category '{category_name}' deleted.", "success")
+        return redirect(url_for("admin"))
 
     @app.route("/admin/user/<int:user_id>/delete", methods=["POST"])
     def delete_user(user_id):
@@ -443,12 +661,8 @@ def create_app(config_overrides=None):
             flash("You cannot delete your own account.", "danger")
             return redirect(url_for("admin"))
 
-        # Delete user's uploaded files from disk.
-        upload_dir = os.path.join(app.root_path, "static", "uploads")
         for res in target.resources:
-            file_path = os.path.join(upload_dir, res.stored_file_name)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            remove_stored_file(res.stored_file_name, res.file_name, res.file_path)
             db.session.delete(res)
 
         db.session.delete(target)

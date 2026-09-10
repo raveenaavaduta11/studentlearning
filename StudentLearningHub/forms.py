@@ -2,9 +2,6 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, Optional
 
-from models import CATEGORY_SEED
-
-
 class RegisterForm(FlaskForm):
     name = StringField('Full Name', validators=[DataRequired(), Length(min=2, max=120)])
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -21,9 +18,16 @@ class LoginForm(FlaskForm):
 
 class ResourceForm(FlaskForm):
     title = StringField('Resource Title', validators=[DataRequired()])
-    category = SelectField('Category', choices=CATEGORY_SEED, validators=[DataRequired()])
+    category = SelectField('Category', choices=[], validators=[DataRequired()])
+    new_category_name = StringField('New Category Name', validators=[Optional(), Length(max=80)])
     description = TextAreaField('Description', validators=[DataRequired()])
     submit = SubmitField('Upload Resource')
+
+
+class CategoryEditForm(FlaskForm):
+    name = StringField('Category Name', validators=[DataRequired(), Length(min=2, max=80)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('Save Category')
 
 
 class ChangePasswordForm(FlaskForm):

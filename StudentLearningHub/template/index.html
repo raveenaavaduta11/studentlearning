@@ -1,55 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}Student Learning Hub — Learn Together, Share Knowledge{% endblock %}
-{% block meta_description %}A platform for students to upload, share, and access useful learning resources in one place.{% endblock %}
+{% block title %}Student Learning Hub — Student Resources{% endblock %}
+{% block meta_description %}Find notes, code, presentations, and project resources shared by students.{% endblock %}
 
 {% block content %}
     <!-- Hero Section -->
     <section class="hero">
         <div class="hero-content animate-fade-up">
-            <h1>Learn Together.<br><span>Share Knowledge.</span></h1>
+            <h1>Find the material<br><span>you need.</span></h1>
             <p>
-                A platform for students to upload, share, and access useful learning resources in one place.
+                Search notes, project code, presentations, and practical resources shared by students.
             </p>
 
             <div class="hero-buttons">
                 <a href="{{ url_for('resources') }}" class="button">Explore Resources</a>
-                <a href="{{ url_for('upload') }}" class="button secondary-button light">Upload Resource</a>
+                {% if user %}
+                <a href="{{ url_for('upload') }}" class="button secondary-button">Upload a Resource</a>
+                {% else %}
+                <a href="{{ url_for('auth') }}" class="button secondary-button">Create an Account</a>
+                {% endif %}
             </div>
         </div>
 
-        <div class="hero-visual" aria-hidden="true">
-            <div class="visual-background"></div>
-            <div class="book-stack">
-                <span class="book book-one"></span>
-                <span class="book book-two"></span>
-                <span class="book book-three"></span>
-            </div>
-            <div class="laptop-screen"></div>
-            <div class="graduation-cap"></div>
-            <div class="pencil"></div>
-            <div class="plant"></div>
-        </div>
     </section>
 
-    <!-- Categories -->
+    <!-- Latest Resources -->
     <main class="home-main">
-        <section class="content-panel glass-panel animate-fade-up">
-            <h2>Browse by Categories</h2>
-
-            <div class="category-grid">
-                {% for cat in categories_list %}
-                <a href="{{ url_for('resources', category=cat.key) }}" class="category-card {{ category_colors.get(cat.key, '') }}" style="text-decoration:none; color:inherit;">
-                    <div class="icon-box">{{ category_icons.get(cat.key, '📁') }}</div>
-                    <h3>{{ cat.name }}</h3>
-                    <p>{{ cat.description }}</p>
-                    <div class="meta-row"><span>{{ cat.resources|length }} Resources</span></div>
-                </a>
-                {% endfor %}
-            </div>
-        </section>
-
-        <!-- Latest Resources -->
         <section class="content-panel glass-panel animate-fade-up">
             <h2>Latest Resources</h2>
 
@@ -71,7 +47,7 @@
                             <td><span class="badge badge-blue">{{ item.category.name }}</span></td>
                             <td>{{ item.user.name }}</td>
                             <td>{{ item.created_at.strftime('%d %b %Y') }}</td>
-                            <td><a href="{{ url_for('resource', resource_id=item.id) }}" class="download-icon">⇩</a></td>
+                            <td><a href="{{ url_for('resource', resource_id=item.id) }}" class="download-icon" aria-label="View resource">View</a></td>
                         </tr>
                         {% else %}
                         <tr>
@@ -86,11 +62,21 @@
             </div>
         </section>
 
-        <!-- Call to Action -->
-        <section class="cta-panel animate-fade-up">
-            <h2>Have Something Useful to Share?</h2>
-            <p>Help other students by sharing your useful learning resources.</p>
-            <a href="{{ url_for('upload') }}" class="button">Upload a Resource</a>
+        <!-- Categories -->
+        <section class="content-panel glass-panel animate-fade-up">
+            <h2>Browse by Categories</h2>
+
+            <div class="category-grid">
+                {% for cat in categories_list %}
+                <a href="{{ url_for('resources', category=cat.key) }}" class="category-card {{ category_color(cat) }}" style="text-decoration:none; color:inherit;">
+                    <div class="icon-box">{{ category_icon(cat) }}</div>
+                    <h3>{{ cat.name }}</h3>
+                    <p>{{ cat.description }}</p>
+                    <div class="meta-row"><span>{{ cat.resources|length }} Resources</span></div>
+                </a>
+                {% endfor %}
+            </div>
         </section>
+
     </main>
 {% endblock %}

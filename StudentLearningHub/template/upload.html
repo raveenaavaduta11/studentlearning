@@ -31,6 +31,15 @@
                         <option value="{{ key }}">{{ name }}</option>
                         {% endfor %}
                     </select>
+                    <p class="form-hint">Can't find the right topic? Create one below while uploading.</p>
+                </div>
+
+                <!-- Optional New Category -->
+                <div class="new-category-fields single-field">
+                    <div class="form-group">
+                        <label for="new_category_name">Create New Category <span>(optional)</span></label>
+                        <input type="text" id="new_category_name" name="new_category_name" maxlength="80" value="{{ form.new_category_name.data or '' }}" placeholder="e.g. Data Science">
+                    </div>
                 </div>
 
                 <!-- Description -->
@@ -44,7 +53,7 @@
                 <div class="form-group">
                     <label for="resource_file">Select Resource File</label>
                     <div class="file-upload" id="drop-zone">
-                        <div class="file-upload-icon">📁</div>
+                        <div class="file-upload-icon">FILE</div>
                         <p class="file-upload-text">Drag & drop your file here, or click to browse</p>
                         <input type="file" id="resource_file" name="resource_file" required>
                         <p class="file-upload-hint">PDF, PPT, DOC, ZIP and other learning-related files (max 10 MB)</p>
@@ -86,6 +95,18 @@
     const filePreview = document.getElementById('file-preview');
     const fileName = document.getElementById('file-name');
     const fileRemove = document.getElementById('file-remove');
+    const categorySelect = document.getElementById('category');
+    const newCategoryInput = document.getElementById('new_category_name');
+
+    function syncCategoryRequirement() {
+        if (!categorySelect || !newCategoryInput) return;
+        categorySelect.required = !newCategoryInput.value.trim();
+    }
+
+    if (newCategoryInput) {
+        newCategoryInput.addEventListener('input', syncCategoryRequirement);
+        syncCategoryRequirement();
+    }
 
     if (dropZone) {
         ['dragenter', 'dragover'].forEach(e => {
