@@ -57,6 +57,11 @@ def create_app(config_overrides=None):
     with app.app_context():
         db.create_all()
 
+    @app.errorhandler(413)
+    def request_too_large(error):
+        flash("This file is too large. Please choose a smaller file.", "danger")
+        return redirect(url_for("upload"))
+
     # ── Helpers ──────────────────────────────────────────────────────
 
     def allowed_file(filename):

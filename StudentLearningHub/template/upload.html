@@ -52,11 +52,11 @@
                 <!-- File Upload (Drag & Drop Zone) -->
                 <div class="form-group">
                     <label for="resource_file">Select Resource File</label>
-                    <div class="file-upload" id="drop-zone">
+                    <div class="file-upload" id="drop-zone" data-max-file-size="{{ config.MAX_CONTENT_LENGTH }}">
                         <div class="file-upload-icon">FILE</div>
                         <p class="file-upload-text">Drag & drop your file here, or click to browse</p>
                         <input type="file" id="resource_file" name="resource_file" required>
-                        <p class="file-upload-hint">PDF, PPT, DOC, ZIP and other learning-related files (max 10 MB)</p>
+                        <p class="file-upload-hint">PDF, PPT, DOC, ZIP and other learning-related files (max {{ (config.MAX_CONTENT_LENGTH / (1024 * 1024))|int }} MB)</p>
                         <div class="file-preview" id="file-preview" style="display:none;">
                             <span class="file-preview-name" id="file-name"></span>
                             <button type="button" class="file-preview-remove" id="file-remove">&times;</button>
@@ -97,6 +97,7 @@
     const fileRemove = document.getElementById('file-remove');
     const categorySelect = document.getElementById('category');
     const newCategoryInput = document.getElementById('new_category_name');
+    const maxFileSize = Number(dropZone.dataset.maxFileSize);
 
     function syncCategoryRequirement() {
         if (!categorySelect || !newCategoryInput) return;
@@ -117,12 +118,18 @@
         });
         dropZone.addEventListener('drop', ev => {
             if (ev.dataTransfer.files.length) {
+                const droppedFile = ev.dataTransfer.files[0];
                 fileInput.files = ev.dataTransfer.files;
-                showPreview(ev.dataTransfer.files[0].name);
+                fileInput.setCustomValidity(droppedFile.size > maxFileSize ? 'This file is too large.' : '');
+                if (droppedFile.size <= maxFileSize) showPreview(droppedFile.name);
             }
         });
         fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) showPreview(fileInput.files[0].name);
+            if (fileInput.files.length) {
+                const selectedFile = fileInput.files[0];
+                fileInput.setCustomValidity(selectedFile.size > maxFileSize ? 'This file is too large.' : '');
+                if (selectedFile.size <= maxFileSize) showPreview(selectedFile.name);
+            }
         });
         fileRemove.addEventListener('click', () => {
             fileInput.value = '';

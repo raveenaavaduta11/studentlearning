@@ -47,6 +47,6 @@ class Config:
     SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "1").lower() in {"1", "true", "yes"}
     SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "0").lower() in {"1", "true", "yes"}
 
-    # Reject uploads larger than 10 MB before they hit the view function.
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024
+    # Vercel rejects function requests above roughly 4.5 MB before Flask runs.
+    MAX_CONTENT_LENGTH = (4 * 1024 * 1024) if os.getenv("VERCEL") else (10 * 1024 * 1024)
     ALLOWED_UPLOAD_EXTENSIONS = ALLOWED_UPLOAD_EXTENSIONS
