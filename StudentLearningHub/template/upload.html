@@ -19,7 +19,7 @@
                 <!-- Title -->
                 <div class="form-group">
                     <label for="title">Resource Title</label>
-                    <input type="text" id="title" name="title" placeholder="e.g. Python Practical Programs" required>
+                    <input type="text" id="title" name="title" value="{{ form.title.data or '' }}" placeholder="e.g. Python Practical Programs" required>
                 </div>
 
                 <!-- Category -->
@@ -45,8 +45,7 @@
                 <!-- Description -->
                 <div class="form-group">
                     <label for="description">Description</label>
-                    <textarea id="description" name="description" rows="5"
-                              placeholder="Briefly describe this resource..."></textarea>
+                    <textarea id="description" name="description" rows="5" placeholder="Briefly describe this resource...">{{ form.description.data or '' }}</textarea>
                 </div>
 
                 <!-- File Upload (Drag & Drop Zone) -->

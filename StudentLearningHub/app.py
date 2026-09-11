@@ -524,7 +524,8 @@ def create_app(config_overrides=None):
                 form.category.choices.append((new_category.key, new_category.name))
                 form.category.data = new_category.key
 
-        if not category_creation_error and form.validate_on_submit():
+        form_valid = form.validate_on_submit()
+        if not category_creation_error and form_valid:
             file = request.files.get("resource_file")
             original_filename = secure_filename(file.filename) if file and file.filename else ""
             if not original_filename:
@@ -598,6 +599,14 @@ def create_app(config_overrides=None):
                 return render_template("upload.html", form=form)
             flash("Resource uploaded successfully!", "success")
             return redirect(url_for("dashboard"))
+
+        if request.method == "POST" and not category_creation_error and not form_valid:
+            if form.errors.get("csrf_token"):
+                flash("Your form session expired. Refresh the page and try again.", "danger")
+            for field_name, errors in form.errors.items():
+                if field_name != "csrf_token":
+                    for error_message in errors:
+                        flash(error_message, "danger")
 
         return render_template("upload.html", form=form)
 
