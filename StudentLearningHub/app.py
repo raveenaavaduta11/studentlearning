@@ -1,6 +1,6 @@
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, session,
-    send_from_directory, abort,
+    send_from_directory, send_file, abort,
 )
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -14,6 +14,7 @@ from forms import (
     ForgotPasswordForm, ResetPasswordForm, EditProfileForm, CategoryEditForm,
 )
 import os
+import io
 import uuid
 import mimetypes
 import zipfile
@@ -21,6 +22,8 @@ import re
 import hashlib
 import smtplib
 import ssl
+import urllib.error
+import urllib.request
 from email.message import EmailMessage
 from datetime import datetime, timedelta
 import cloudinary
@@ -80,6 +83,22 @@ def create_app(config_overrides=None):
         if extension:
             options["format"] = extension
         return cloudinary.utils.cloudinary_url(resource_item.stored_file_name, **options)[0]
+
+    def download_cloudinary_raw_file(resource_item):
+        try:
+            with urllib.request.urlopen(resource_item.file_path, timeout=30) as response:
+                file_data = response.read()
+        except (OSError, urllib.error.URLError):
+            app.logger.exception("Unable to retrieve Cloudinary file %s", resource_item.stored_file_name)
+            abort(502)
+
+        mime_type = mimetypes.guess_type(resource_item.file_name)[0] or "application/octet-stream"
+        return send_file(
+            io.BytesIO(file_data),
+            mimetype=mime_type,
+            as_attachment=True,
+            download_name=resource_item.file_name,
+        )
 
     def local_file_directory(resource_item):
         if resource_item.file_path and os.path.isabs(resource_item.file_path):
@@ -416,6 +435,8 @@ def create_app(config_overrides=None):
         if resource_item is None:
             abort(404)
         if resource_item.file_path and resource_item.file_path.startswith("http"):
+            if cloudinary_resource_type(resource_item.file_name) == "raw":
+                return download_cloudinary_raw_file(resource_item)
             return redirect(cloudinary_download_url(resource_item))
         return send_from_directory(
             local_file_directory(resource_item),
