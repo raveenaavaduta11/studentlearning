@@ -44,6 +44,7 @@ class Config:
     SMTP_USERNAME = os.getenv("SMTP_USERNAME")
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
     SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME)
+    SMTP_CONTACT_RECIPIENT = os.getenv("SMTP_CONTACT_RECIPIENT", SMTP_FROM_EMAIL)
     SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "1").lower() in {"1", "true", "yes"}
     SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "0").lower() in {"1", "true", "yes"}
 

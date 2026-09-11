@@ -275,6 +275,46 @@ def create_app(config_overrides=None):
             app.logger.exception("Unable to send password notification email to %s", user.email)
             return False
 
+    def send_contact_email(name, email, subject, message_body):
+        required_settings = (
+            "SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL",
+            "SMTP_CONTACT_RECIPIENT",
+        )
+        if not all(app.config.get(name) for name in required_settings):
+            app.logger.error("Contact email is not configured")
+            return False
+
+        message = EmailMessage()
+        message["Subject"] = f"Student Learning Hub contact: {subject}"
+        message["From"] = app.config["SMTP_FROM_EMAIL"]
+        message["To"] = app.config["SMTP_CONTACT_RECIPIENT"]
+        message["Reply-To"] = email
+        message.set_content(
+            f"Name: {name}\n"
+            f"Email: {email}\n"
+            f"Subject: {subject}\n\n"
+            f"{message_body}"
+        )
+
+        try:
+            smtp_context = ssl.create_default_context()
+            if app.config["SMTP_USE_SSL"]:
+                with smtplib.SMTP_SSL(app.config["SMTP_HOST"], app.config["SMTP_PORT"], context=smtp_context) as server:
+                    server.login(app.config["SMTP_USERNAME"], app.config["SMTP_PASSWORD"])
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(app.config["SMTP_HOST"], app.config["SMTP_PORT"]) as server:
+                    server.ehlo()
+                    if app.config["SMTP_USE_TLS"]:
+                        server.starttls(context=smtp_context)
+                        server.ehlo()
+                    server.login(app.config["SMTP_USERNAME"], app.config["SMTP_PASSWORD"])
+                    server.send_message(message)
+            return True
+        except (OSError, smtplib.SMTPException):
+            app.logger.exception("Unable to send contact email from %s", email)
+            return False
+
     @app.before_request
     def protect_legacy_uploads():
         if request.path.startswith("/static/uploads/") and current_user() is None:
@@ -333,7 +373,10 @@ def create_app(config_overrides=None):
             message = request.form.get("message", "").strip()
 
             if name and email and subject and message:
-                flash("Thank you for your message! We'll get back to you soon.", "success")
+                if send_contact_email(name, email, subject, message):
+                    flash("Thank you for your message! We'll get back to you soon.", "success")
+                else:
+                    flash("Your message could not be sent right now. Please try again later.", "danger")
                 return redirect(url_for("contact"))
             else:
                 flash("Please fill in all required fields.", "danger")

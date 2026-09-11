@@ -44,6 +44,7 @@ SMTP_PORT=587
 SMTP_USERNAME=<brevo-login-email>
 SMTP_PASSWORD=<brevo-smtp-key>
 SMTP_FROM_EMAIL=<verified-sender-email>
+SMTP_CONTACT_RECIPIENT=<support-inbox-email>
 SMTP_USE_TLS=1
 SMTP_USE_SSL=0
 ```
@@ -65,7 +66,7 @@ Do not commit the API secret. Add all three Cloudinary variables to Vercel's Pro
 ## 6. Password-reset email
 
 Configure an SMTP provider and add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
-`SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` to Vercel's Production environment.
+`SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and `SMTP_CONTACT_RECIPIENT` to Vercel's Production environment.
 The default uses STARTTLS on port 587. Set `SMTP_USE_SSL=1` for providers that
 require implicit TLS, such as port 465. Reset tokens are sent only by email and
 are never displayed in the browser.
