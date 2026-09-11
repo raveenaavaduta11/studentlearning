@@ -48,7 +48,8 @@ def create_app(config_overrides=None):
     app.config.setdefault("RATELIMIT_ENABLED", not app.config.get("TESTING", False))
     limiter.init_app(app)
 
-    os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
+    if not os.getenv("VERCEL"):
+        os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
 
     with app.app_context():
         db.create_all()
@@ -533,6 +534,9 @@ def create_app(config_overrides=None):
                 stored_filename = cloudinary_result["public_id"]
                 stored_file_path = cloudinary_result["secure_url"]
             else:
+                if os.getenv("VERCEL"):
+                    flash("Cloudinary must be configured before uploading on Vercel.", "danger")
+                    return render_template("upload.html", form=form)
                 upload_dir = os.path.join(app.root_path, "instance", "uploads")
                 os.makedirs(upload_dir, exist_ok=True)
                 file.save(os.path.join(upload_dir, stored_filename))
