@@ -19,9 +19,13 @@ import mimetypes
 import zipfile
 import re
 import hashlib
+import smtplib
+import ssl
+from email.message import EmailMessage
 from datetime import datetime, timedelta
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
@@ -34,6 +38,16 @@ def create_app(config_overrides=None):
     app.config.from_object(Config)
     if config_overrides:
         app.config.update(config_overrides)
+    if os.getenv("VERCEL") and (
+        not app.config.get("DATABASE_URL")
+        or not all(app.config.get(name) for name in (
+            "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        ))
+        or not all(app.config.get(name) for name in (
+            "SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL",
+        ))
+    ):
+        raise RuntimeError("DATABASE_URL, Cloudinary, and SMTP settings are required on Vercel")
     db.init_app(app)
     csrf.init_app(app)
 
@@ -54,12 +68,32 @@ def create_app(config_overrides=None):
         return ext in app.config["ALLOWED_UPLOAD_EXTENSIONS"]
 
     def cloudinary_enabled():
-        return all(os.getenv(name) for name in (
+        return all(app.config.get(name) for name in (
             "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
         ))
 
     def cloudinary_resource_type(filename):
         return "image" if filename.rsplit(".", 1)[-1].lower() in {"png", "jpg", "jpeg", "gif"} else "raw"
+
+    def cloudinary_download_url(resource_item):
+        resource_type = cloudinary_resource_type(resource_item.file_name)
+        extension = resource_item.file_name.rsplit(".", 1)[-1].lower() if "." in resource_item.file_name else None
+        options = {
+            "resource_type": resource_type,
+            "type": "upload",
+            "secure": True,
+            "flags": f"attachment:{secure_filename(resource_item.file_name)}",
+        }
+        if extension:
+            options["format"] = extension
+        return cloudinary.utils.cloudinary_url(resource_item.stored_file_name, **options)[0]
+
+    def local_file_directory(resource_item):
+        if resource_item.file_path and os.path.isabs(resource_item.file_path):
+            return os.path.dirname(resource_item.file_path)
+        if resource_item.file_path and resource_item.file_path.replace("\\", "/").startswith("static/uploads/"):
+            return os.path.join(app.root_path, "static", "uploads")
+        return os.path.join(app.root_path, "instance", "uploads")
 
     def remove_stored_file(stored_file_name, file_name, file_path):
         if cloudinary_enabled() and file_path and file_path.startswith("http"):
@@ -73,15 +107,19 @@ def create_app(config_overrides=None):
                 app.logger.exception("Unable to remove Cloudinary file %s", stored_file_name)
             return
 
-        local_path = os.path.join(app.root_path, "static", "uploads", stored_file_name)
+        local_path = stored_file_name if os.path.isabs(stored_file_name) else os.path.join(
+            app.root_path, "instance", "uploads", stored_file_name,
+        )
+        if not os.path.exists(local_path):
+            local_path = os.path.join(app.root_path, "static", "uploads", stored_file_name)
         if os.path.exists(local_path):
             os.remove(local_path)
 
     if cloudinary_enabled():
         cloudinary.config(
-            cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-            api_key=os.getenv("CLOUDINARY_API_KEY"),
-            api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+            cloud_name=app.config["CLOUDINARY_CLOUD_NAME"],
+            api_key=app.config["CLOUDINARY_API_KEY"],
+            api_secret=app.config["CLOUDINARY_API_SECRET"],
             secure=True,
         )
 
@@ -123,6 +161,8 @@ def create_app(config_overrides=None):
                 )
             except (OSError, zipfile.BadZipFile):
                 return False
+            finally:
+                file.seek(position)
         if extension == "txt":
             try:
                 file.seek(position)
@@ -143,6 +183,50 @@ def create_app(config_overrides=None):
             # Session refers to a user that no longer exists (e.g. DB reset).
             session.clear()
         return user
+
+    def send_password_reset_email(user, reset_url):
+        required_settings = ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL")
+        if not all(app.config.get(name) for name in required_settings):
+            app.logger.error("Password reset email is not configured")
+            return False
+
+        message = EmailMessage()
+        message["Subject"] = "Reset your Student Learning Hub password"
+        message["From"] = app.config["SMTP_FROM_EMAIL"]
+        message["To"] = user.email
+        message.set_content(
+            f"Hello {user.name},\n\n"
+            "Use the link below to reset your Student Learning Hub password. "
+            "It expires in 1 hour.\n\n"
+            f"{reset_url}\n\n"
+            "If you did not request this, you can ignore this email."
+        )
+
+        try:
+            smtp_host = app.config["SMTP_HOST"]
+            smtp_port = app.config["SMTP_PORT"]
+            smtp_context = ssl.create_default_context()
+            if app.config["SMTP_USE_SSL"]:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, context=smtp_context) as server:
+                    server.login(app.config["SMTP_USERNAME"], app.config["SMTP_PASSWORD"])
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.ehlo()
+                    if app.config["SMTP_USE_TLS"]:
+                        server.starttls(context=smtp_context)
+                        server.ehlo()
+                    server.login(app.config["SMTP_USERNAME"], app.config["SMTP_PASSWORD"])
+                    server.send_message(message)
+            return True
+        except (OSError, smtplib.SMTPException):
+            app.logger.exception("Unable to send password reset email to %s", user.email)
+            return False
+
+    @app.before_request
+    def protect_legacy_uploads():
+        if request.path.startswith("/static/uploads/") and current_user() is None:
+            return redirect(url_for("auth"))
 
     def category_icon(category):
         if category.key in CATEGORY_ICONS:
@@ -242,12 +326,11 @@ def create_app(config_overrides=None):
 
         return render_template("auth.html", login_form=login_form, register_form=register_form)
 
-    # ── Forgot / Reset Password (simulated — no email sent) ─────────
+    # ── Forgot / Reset Password ─────────────────────────────────────
 
     @app.route("/forgot-password", methods=["GET", "POST"])
     def forgot_password():
         form = ForgotPasswordForm()
-        reset_link = None
 
         if form.validate_on_submit():
             email = form.email.data.strip().lower()
@@ -257,14 +340,15 @@ def create_app(config_overrides=None):
                 user.reset_token = token
                 user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
                 db.session.commit()
-                # Simulated: show the link on-screen instead of emailing it.
-                reset_link = url_for("reset_password", token=token, _external=True)
-                flash("Reset link generated! Copy the link below to reset your password.", "success")
-            else:
-                # Don't reveal whether the email exists.
-                flash("If that email is registered, a reset link has been generated.", "info")
+                reset_url = url_for("reset_password", token=token, _external=True)
+                if not send_password_reset_email(user, reset_url):
+                    user.reset_token = None
+                    user.reset_token_expires = None
+                    db.session.commit()
+            # Do not reveal whether the email exists or whether delivery succeeded.
+            flash("If that email is registered, a reset link has been sent.", "info")
 
-        return render_template("forgot_password.html", form=form, reset_link=reset_link)
+        return render_template("forgot_password.html", form=form)
 
     @app.route("/reset-password/<token>", methods=["GET", "POST"])
     def reset_password(token):
@@ -339,10 +423,12 @@ def create_app(config_overrides=None):
         if resource_item is None:
             abort(404)
         if resource_item.file_path and resource_item.file_path.startswith("http"):
-            return redirect(resource_item.file_path)
+            return redirect(cloudinary_download_url(resource_item))
         return send_from_directory(
-            os.path.join(app.root_path, "static", "uploads"), resource_item.stored_file_name,
-            as_attachment=True, download_name=resource_item.file_name,
+            local_file_directory(resource_item),
+            os.path.basename(resource_item.stored_file_name),
+            as_attachment=True,
+            download_name=resource_item.file_name,
         )
 
     @app.route("/resource/<int:resource_id>/preview")
@@ -357,8 +443,8 @@ def create_app(config_overrides=None):
             return redirect(resource_item.file_path)
         mime_type = mimetypes.guess_type(resource_item.file_name)[0] or "application/octet-stream"
         return send_from_directory(
-            os.path.join(app.root_path, "static", "uploads"),
-            resource_item.stored_file_name,
+            local_file_directory(resource_item),
+            os.path.basename(resource_item.stored_file_name),
             mimetype=mime_type,
             as_attachment=False,
         )
@@ -441,19 +527,24 @@ def create_app(config_overrides=None):
             stored_filename = f"{uuid.uuid4().hex}.{ext}"
 
             if cloudinary_enabled():
-                cloudinary_result = cloudinary.uploader.upload(
-                    file,
-                    resource_type="auto",
-                    folder="student-learning-hub",
-                    public_id=uuid.uuid4().hex,
-                )
+                try:
+                    cloudinary_result = cloudinary.uploader.upload(
+                        file,
+                        resource_type=cloudinary_resource_type(original_filename),
+                        folder="student-learning-hub",
+                        public_id=uuid.uuid4().hex,
+                    )
+                except Exception:
+                    app.logger.exception("Cloudinary upload failed for %s", original_filename)
+                    flash("The file could not be uploaded to cloud storage. Please try again.", "danger")
+                    return render_template("upload.html", form=form)
                 stored_filename = cloudinary_result["public_id"]
                 stored_file_path = cloudinary_result["secure_url"]
             else:
-                upload_dir = os.path.join(app.root_path, "static", "uploads")
+                upload_dir = os.path.join(app.root_path, "instance", "uploads")
                 os.makedirs(upload_dir, exist_ok=True)
                 file.save(os.path.join(upload_dir, stored_filename))
-                stored_file_path = os.path.join("static", "uploads", stored_filename)
+                stored_file_path = os.path.join(upload_dir, stored_filename)
 
             category = Category.query.filter_by(key=form.category.data).first()
             if new_category is not None:
@@ -461,6 +552,7 @@ def create_app(config_overrides=None):
                 db.session.add(category)
                 db.session.flush()
             if category is None:
+                remove_stored_file(stored_filename, original_filename, stored_file_path)
                 flash("Please select an available category.", "danger")
                 return render_template("upload.html", form=form)
 
@@ -474,7 +566,14 @@ def create_app(config_overrides=None):
                 uploaded_by=user.id,
             )
             db.session.add(resource_item)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                remove_stored_file(stored_filename, original_filename, stored_file_path)
+                app.logger.exception("Unable to save resource metadata for %s", original_filename)
+                flash("The resource could not be saved. Please try again.", "danger")
+                return render_template("upload.html", form=form)
             flash("Resource uploaded successfully!", "success")
             return redirect(url_for("dashboard"))
 

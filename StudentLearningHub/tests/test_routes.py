@@ -1,9 +1,11 @@
 import io
+import os
+import zipfile
 
 import pytest
 
 from app import create_app
-from models import db, Category
+from models import db, Category, Resource
 
 
 @pytest.fixture
@@ -126,6 +128,22 @@ def test_register_and_login_flow(client):
     assert b"Test Student" in dashboard_response.data
 
 
+def test_forgot_password_does_not_expose_reset_token(client, app):
+    register(client)
+
+    response = client.post("/forgot-password", data={
+        "email": "student@example.com",
+    }, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"If that email is registered, a reset link has been sent" in response.data
+    assert b"Your Reset Link" not in response.data
+    assert b"reset-password/" not in response.data
+    with app.app_context():
+        from models import User
+        assert User.query.filter_by(email="student@example.com").one().reset_token is None
+
+
 def test_duplicate_registration_is_rejected(client):
     register(client)
     second_attempt = register(client)
@@ -187,6 +205,44 @@ def test_upload_rejects_mismatched_file_signature(client):
         "/upload", data=data, content_type="multipart/form-data", follow_redirects=True,
     )
     assert b"does not match its extension" in response.data
+
+
+def test_office_upload_keeps_complete_file(client, app):
+    register(client)
+    login(client)
+
+    office_file = io.BytesIO()
+    with zipfile.ZipFile(office_file, "w") as archive:
+        archive.writestr("[Content_Types].xml", "content types")
+        archive.writestr("word/document.xml", "document")
+    office_file.seek(0)
+
+    response = client.post("/upload", data={
+        "title": "Word Notes",
+        "category": "practical",
+        "description": "A document upload.",
+        "resource_file": (office_file, "notes.docx"),
+    }, follow_redirects=True)
+
+    assert b"Resource uploaded successfully" in response.data
+    with app.app_context():
+        resource = Resource.query.filter_by(file_name="notes.docx").one()
+        stored_path = resource.file_path
+        assert os.path.getsize(stored_path) > 0
+        with open(stored_path, "rb") as stored_file:
+            assert stored_file.read(2) == b"PK"
+        resource_id = resource.id
+
+    download_response = client.get(f"/resource/{resource_id}/download")
+    assert download_response.status_code == 200
+    assert download_response.data[:2] == b"PK"
+    os.remove(stored_path)
+
+
+def test_static_upload_paths_require_login(client):
+    response = client.get("/static/uploads/unknown.pdf")
+    assert response.status_code == 302
+    assert "/auth" in response.headers["Location"]
 
 
 def test_dashboard_search_filters_user_uploads(client):

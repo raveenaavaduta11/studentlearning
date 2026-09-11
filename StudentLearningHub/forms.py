@@ -17,10 +17,10 @@ class LoginForm(FlaskForm):
 
 
 class ResourceForm(FlaskForm):
-    title = StringField('Resource Title', validators=[DataRequired()])
+    title = StringField('Resource Title', validators=[DataRequired(), Length(max=150)])
     category = SelectField('Category', choices=[], validators=[DataRequired()])
     new_category_name = StringField('New Category Name', validators=[Optional(), Length(max=80)])
-    description = TextAreaField('Description', validators=[DataRequired()])
+    description = TextAreaField('Description', validators=[DataRequired(), Length(max=10000)])
     submit = SubmitField('Upload Resource')
 
 
@@ -40,7 +40,7 @@ class ChangePasswordForm(FlaskForm):
 
 
 class ForgotPasswordForm(FlaskForm):
-    """Request a password-reset link (simulated — shown on-screen)."""
+    """Request a password-reset link by email."""
     email = StringField('Email Address', validators=[DataRequired(), Email()])
     submit = SubmitField('Send Reset Link')
 

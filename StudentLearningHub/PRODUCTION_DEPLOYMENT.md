@@ -39,6 +39,13 @@ FLASK_DEBUG=0
 CLOUDINARY_CLOUD_NAME=<cloudinary-cloud-name>
 CLOUDINARY_API_KEY=<cloudinary-api-key>
 CLOUDINARY_API_SECRET=<cloudinary-api-secret>
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USERNAME=<brevo-login-email>
+SMTP_PASSWORD=<brevo-smtp-key>
+SMTP_FROM_EMAIL=<verified-sender-email>
+SMTP_USE_TLS=1
+SMTP_USE_SSL=0
 ```
 
 Redeploy after adding or changing environment variables.
@@ -55,9 +62,17 @@ Create a free Cloudinary account and copy the three values from its dashboard. W
 
 Do not commit the API secret. Add all three Cloudinary variables to Vercel's Production environment.
 
+## 6. Password-reset email
+
+Configure an SMTP provider and add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` to Vercel's Production environment.
+The default uses STARTTLS on port 587. Set `SMTP_USE_SSL=1` for providers that
+require implicit TLS, such as port 465. Reset tokens are sent only by email and
+are never displayed in the browser.
+
 The free tier is suitable for a college demo, but review its storage and bandwidth limits before broad public use.
 
-## 6. Verify deployment
+## 7. Verify deployment
 
 Open the Vercel URL and test:
 
@@ -66,7 +81,7 @@ Open the Vercel URL and test:
 - resource upload and download
 - admin category/resource controls
 
-## 6. Short URL for the college
+## 8. Short URL for the college
 
 After `vercel --prod`, Vercel gives the project a URL such as `student-learning-hub.vercel.app`. Use that URL as the college demo link. You can also set a short custom domain in Vercel's Domains settings, such as `slh-demo.vercel.app`, if the name is available.
 

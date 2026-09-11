@@ -39,7 +39,7 @@ class User(db.Model):
     role = db.Column(db.String(20), default="student")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Password-reset token (simulated — shown on-screen rather than emailed).
+    # Password-reset token sent by email and invalidated after use or expiry.
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expires = db.Column(db.DateTime, nullable=True)
 
