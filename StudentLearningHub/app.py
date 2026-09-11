@@ -38,16 +38,8 @@ def create_app(config_overrides=None):
     app.config.from_object(Config)
     if config_overrides:
         app.config.update(config_overrides)
-    if os.getenv("VERCEL") and (
-        not app.config.get("DATABASE_URL")
-        or not all(app.config.get(name) for name in (
-            "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
-        ))
-        or not all(app.config.get(name) for name in (
-            "SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL",
-        ))
-    ):
-        raise RuntimeError("DATABASE_URL, Cloudinary, and SMTP settings are required on Vercel")
+    if os.getenv("VERCEL") and not app.config.get("DATABASE_URL"):
+        raise RuntimeError("DATABASE_URL is required on Vercel")
     db.init_app(app)
     csrf.init_app(app)
 
