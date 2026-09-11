@@ -240,6 +240,41 @@ def create_app(config_overrides=None):
             app.logger.exception("Unable to send password reset email to %s", user.email)
             return False
 
+    def send_password_changed_email(user):
+        required_settings = ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL")
+        if not all(app.config.get(name) for name in required_settings):
+            app.logger.error("Password notification email is not configured")
+            return False
+
+        message = EmailMessage()
+        message["Subject"] = "Your Student Learning Hub password was changed"
+        message["From"] = app.config["SMTP_FROM_EMAIL"]
+        message["To"] = user.email
+        message.set_content(
+            f"Hello {user.name},\n\n"
+            "Your Student Learning Hub password was changed successfully.\n\n"
+            "If you did not make this change, contact the site administrator immediately."
+        )
+
+        try:
+            smtp_context = ssl.create_default_context()
+            if app.config["SMTP_USE_SSL"]:
+                with smtplib.SMTP_SSL(app.config["SMTP_HOST"], app.config["SMTP_PORT"], context=smtp_context) as server:
+                    server.login(app.config["SMTP_USERNAME"], app.config["SMTP_PASSWORD"])
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(app.config["SMTP_HOST"], app.config["SMTP_PORT"]) as server:
+                    server.ehlo()
+                    if app.config["SMTP_USE_TLS"]:
+                        server.starttls(context=smtp_context)
+                        server.ehlo()
+                    server.login(app.config["SMTP_USERNAME"], app.config["SMTP_PASSWORD"])
+                    server.send_message(message)
+            return True
+        except (OSError, smtplib.SMTPException):
+            app.logger.exception("Unable to send password notification email to %s", user.email)
+            return False
+
     @app.before_request
     def protect_legacy_uploads():
         if request.path.startswith("/static/uploads/") and current_user() is None:
@@ -648,7 +683,10 @@ def create_app(config_overrides=None):
             else:
                 user.password = generate_password_hash(password_form.new_password.data)
                 db.session.commit()
-                flash("Password changed successfully.", "success")
+                if send_password_changed_email(user):
+                    flash("Password changed successfully. A notification email was sent.", "success")
+                else:
+                    flash("Password changed successfully, but the notification email could not be sent.", "warning")
         else:
             for error_messages in password_form.errors.values():
                 for error_message in error_messages:
