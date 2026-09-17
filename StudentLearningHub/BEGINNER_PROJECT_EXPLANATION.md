@@ -93,6 +93,8 @@ A simplified template structure looks like this:
 </html>
 ```
 
+test
+
 Important HTML ideas in this example:
 
 - `<html>` contains the page.
