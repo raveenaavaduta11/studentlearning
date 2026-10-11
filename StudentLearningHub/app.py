@@ -89,7 +89,7 @@ def create_app(config_overrides=None):
             options["format"] = extension
         return cloudinary.utils.cloudinary_url(resource_item.stored_file_name, **options)[0]
 
-    def download_cloudinary_raw_file(resource_item):
+    def serve_cloudinary_raw_file(resource_item, as_attachment):
         try:
             with urllib.request.urlopen(resource_item.file_path, timeout=30) as response:
                 file_data = response.read()
@@ -101,7 +101,7 @@ def create_app(config_overrides=None):
         return send_file(
             io.BytesIO(file_data),
             mimetype=mime_type,
-            as_attachment=True,
+            as_attachment=as_attachment,
             download_name=resource_item.file_name,
         )
 
@@ -519,7 +519,7 @@ def create_app(config_overrides=None):
             abort(404)
         if resource_item.file_path and resource_item.file_path.startswith("http"):
             if cloudinary_resource_type(resource_item.file_name) == "raw":
-                return download_cloudinary_raw_file(resource_item)
+                return serve_cloudinary_raw_file(resource_item, as_attachment=True)
             return redirect(cloudinary_download_url(resource_item))
         return send_from_directory(
             local_file_directory(resource_item),
@@ -537,6 +537,8 @@ def create_app(config_overrides=None):
         if resource_item is None:
             abort(404)
         if resource_item.file_path and resource_item.file_path.startswith("http"):
+            if cloudinary_resource_type(resource_item.file_name) == "raw":
+                return serve_cloudinary_raw_file(resource_item, as_attachment=False)
             return redirect(resource_item.file_path)
         mime_type = mimetypes.guess_type(resource_item.file_name)[0] or "application/octet-stream"
         return send_from_directory(

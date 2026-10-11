@@ -191,6 +191,49 @@ def test_upload_and_view_resource(client):
     assert b"Python Notes" in resources_response.data
 
 
+def test_cloudinary_raw_preview_is_inline(client, app, monkeypatch):
+    register(client)
+    login(client)
+
+    with app.app_context():
+        from models import User
+        resource = Resource(
+            title="Cloud PDF",
+            description="A PDF stored in Cloudinary.",
+            file_name="notes.pdf",
+            stored_file_name="cloud-pdf",
+            file_path="https://cloudinary.example/notes.pdf",
+            category_id=Category.query.filter_by(key="practical").one().id,
+            uploaded_by=User.query.filter_by(email="student@example.com").one().id,
+        )
+        db.session.add(resource)
+        db.session.commit()
+        resource_id = resource.id
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return b"%PDF-1.4 preview test"
+
+    monkeypatch.setattr("app.urllib.request.urlopen", lambda *args, **kwargs: FakeResponse())
+    response = client.get(f"/resource/{resource_id}/preview")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert response.headers["Content-Disposition"].startswith("inline;")
+    assert response.data.startswith(b"%PDF-")
+
+    download_response = client.get(f"/resource/{resource_id}/download")
+    assert download_response.status_code == 200
+    assert download_response.headers["Content-Disposition"].startswith("attachment;")
+    assert download_response.data.startswith(b"%PDF-")
+
+
 def test_upload_rejects_mismatched_file_signature(client):
     register(client)
     login(client)
