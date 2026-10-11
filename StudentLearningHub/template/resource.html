@@ -44,7 +44,7 @@
             </div>
 
             {% set file_extension = resource.file_name.rsplit('.', 1)[-1].lower() if '.' in resource.file_name else '' %}
-            {% if file_extension in ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'txt'] %}
+            {% if file_extension in ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'txt', 'docx'] %}
             <div class="resource-preview glass-panel">
                 <div class="preview-heading">
                     <h2>Preview</h2>
@@ -54,6 +54,8 @@
                 <iframe src="{{ url_for('preview_resource', resource_id=resource.id) }}" title="Preview of {{ resource.title }}"></iframe>
                 {% elif file_extension in ['png', 'jpg', 'jpeg', 'gif'] %}
                 <img src="{{ url_for('preview_resource', resource_id=resource.id) }}" alt="Preview of {{ resource.title }}">
+                {% elif file_extension == 'docx' %}
+                <div class="docx-preview-content" id="docx-preview" data-preview-url="{{ url_for('preview_resource', resource_id=resource.id) }}" aria-live="polite">Loading preview...</div>
                 {% else %}
                 <iframe src="{{ url_for('preview_resource', resource_id=resource.id) }}" title="Preview of {{ resource.title }}"></iframe>
                 {% endif %}
@@ -75,4 +77,33 @@
         </div>
 
     </main>
+{% endblock %}
+
+{% block scripts_extra %}
+{% if resource.file_name.rsplit('.', 1)[-1].lower() == 'docx' %}
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.4.0/dist/docx-preview.min.js"></script>
+<script>
+    const docxPreview = document.getElementById("docx-preview");
+    if (docxPreview) {
+        fetch(docxPreview.dataset.previewUrl, { credentials: "same-origin" })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Preview request failed");
+                }
+                return response.arrayBuffer();
+            })
+            .then((documentData) => {
+                if (!window.docx || !window.docx.renderAsync) {
+                    throw new Error("Document renderer unavailable");
+                }
+                return window.docx.renderAsync(documentData, docxPreview);
+            })
+            .catch(() => {
+                docxPreview.classList.add("preview-error");
+                docxPreview.textContent = "Preview unavailable. Download the file to view it.";
+            });
+    }
+</script>
+{% endif %}
 {% endblock %}

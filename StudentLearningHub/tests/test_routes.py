@@ -14,6 +14,9 @@ def app():
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "WTF_CSRF_ENABLED": False,
+        "CLOUDINARY_CLOUD_NAME": None,
+        "CLOUDINARY_API_KEY": None,
+        "CLOUDINARY_API_SECRET": None,
     })
     with app.app_context():
         db.session.add(Category(key="practical", name="Practical Programs", description="Practice resources"))
@@ -276,9 +279,15 @@ def test_office_upload_keeps_complete_file(client, app):
             assert stored_file.read(2) == b"PK"
         resource_id = resource.id
 
+    detail_response = client.get(f"/resource/{resource_id}")
+    assert detail_response.status_code == 200
+    assert b'id="docx-preview"' in detail_response.data
+    assert b"docx-preview@0.4.0/dist/docx-preview.min.js" in detail_response.data
+
     download_response = client.get(f"/resource/{resource_id}/download")
     assert download_response.status_code == 200
     assert download_response.data[:2] == b"PK"
+    download_response.close()
     os.remove(stored_path)
 
 

@@ -130,6 +130,23 @@ img {
     object-fit: contain;
 }
 
+.docx-preview-content {
+    background: #edf0f2;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    max-height: 720px;
+    overflow: auto;
+    padding: 1rem;
+}
+
+.docx-preview-content .docx-wrapper {
+    margin: 0 auto;
+}
+
+.docx-preview-content.preview-error {
+    color: var(--gray-600);
+}
+
 
 /* ── Animations ────────────────────────────────────────── */
 
